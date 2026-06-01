@@ -1,25 +1,15 @@
-"""This module is the entry point for your python application."""
+from dataset_loader import load_brain_tumor_dataset
 
 
-def sum(a: int, b: int) -> int:
-    """
-    Returns the sum of two integers.
-
-    Args:
-        a (int): The first integer.
-        b (int): The second integer.
-
-    Returns:
-        int: The sum of the two integers.
-
-    """
-    return a + b
+DATASET_PATH = "data/archive/Data"
 
 
-def main():
-    """The main function of the application."""
-    sum(2, 3)
+images, labels = load_brain_tumor_dataset(DATASET_PATH)
+# images[0]  # the pixels of the first brain MRI image
+# labels[0]  # the answer/class for that image
 
+print("images shape:", images.shape)
+print("labels shape:", labels.shape)
 
-if __name__ == "__main__":
-    main()
+print("First image shape:", images[0].shape)
+print("First label:", labels[0])
