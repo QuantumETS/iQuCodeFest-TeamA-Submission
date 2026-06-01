@@ -1,0 +1,40 @@
+name: Unit tests
+
+on:
+  push:
+    # Trigger on all pushes to main and dev branches regardless of the files changed (failsafe)
+    branches:
+      - main
+      - dev
+  pull_request:
+    paths:
+      - ".github/workflows/unit-tests.yml" # Trigger on changes to this workflow file
+      - "src/**"
+      - "tests/**"
+      - "*.toml"
+      - "uv.lock"
+
+jobs:
+  unit-tests:
+    name: Run unit tests
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: 3.14
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@08807647e7069bb48b6ef5acd8ec9567f424441b
+        with:
+          enable-cache: true
+
+      - name: Install dependencies
+        run: uv sync --locked --group dev
+
+      - name: Run unit tests with pytest
+        run: uv run pytest tests/
