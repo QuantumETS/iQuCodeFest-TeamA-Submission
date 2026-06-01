@@ -157,6 +157,7 @@ wheels = [
 ]
 
 [[package]]
+<<<<<<< HEAD
 name = "cryptography"
 version = "48.0.0"
 source = { registry = "https://pypi.org/simple" }
@@ -272,6 +273,8 @@ nvtx = [
 ]
 
 [[package]]
+=======
+>>>>>>> main
 name = "cycler"
 version = "0.12.1"
 source = { registry = "https://pypi.org/simple" }
@@ -281,6 +284,7 @@ wheels = [
 ]
 
 [[package]]
+<<<<<<< HEAD
 name = "dill"
 version = "0.4.1"
 source = { registry = "https://pypi.org/simple" }
@@ -299,6 +303,8 @@ wheels = [
 ]
 
 [[package]]
+=======
+>>>>>>> main
 name = "fonttools"
 version = "4.63.0"
 source = { registry = "https://pypi.org/simple" }
@@ -324,6 +330,7 @@ wheels = [
 ]
 
 [[package]]
+<<<<<<< HEAD
 name = "fsspec"
 version = "2026.4.0"
 source = { registry = "https://pypi.org/simple" }
@@ -384,6 +391,8 @@ wheels = [
 ]
 
 [[package]]
+=======
+>>>>>>> main
 name = "iniconfig"
 version = "2.3.0"
 source = { registry = "https://pypi.org/simple" }
@@ -393,6 +402,7 @@ wheels = [
 ]
 
 [[package]]
+<<<<<<< HEAD
 name = "jinja2"
 version = "3.1.6"
 source = { registry = "https://pypi.org/simple" }
@@ -414,6 +424,8 @@ wheels = [
 ]
 
 [[package]]
+=======
+>>>>>>> main
 name = "kiwisolver"
 version = "1.5.0"
 source = { registry = "https://pypi.org/simple" }
@@ -452,6 +464,7 @@ wheels = [
 ]
 
 [[package]]
+<<<<<<< HEAD
 name = "markupsafe"
 version = "3.0.3"
 source = { registry = "https://pypi.org/simple" }
@@ -482,6 +495,8 @@ wheels = [
 ]
 
 [[package]]
+=======
+>>>>>>> main
 name = "matplotlib"
 version = "3.10.9"
 source = { registry = "https://pypi.org/simple" }
@@ -515,6 +530,7 @@ wheels = [
 ]
 
 [[package]]
+<<<<<<< HEAD
 name = "mpmath"
 version = "1.3.0"
 source = { registry = "https://pypi.org/simple" }
@@ -533,6 +549,8 @@ wheels = [
 ]
 
 [[package]]
+=======
+>>>>>>> main
 name = "numpy"
 version = "2.4.6"
 source = { registry = "https://pypi.org/simple" }
@@ -562,6 +580,7 @@ wheels = [
 ]
 
 [[package]]
+<<<<<<< HEAD
 name = "nvidia-cublas"
 version = "13.1.1.3"
 source = { registry = "https://pypi.org/simple" }
@@ -737,6 +756,8 @@ wheels = [
 ]
 
 [[package]]
+=======
+>>>>>>> main
 name = "packaging"
 version = "26.2"
 source = { registry = "https://pypi.org/simple" }
@@ -913,6 +934,7 @@ wheels = [
 ]
 
 [[package]]
+<<<<<<< HEAD
 name = "pyjwt"
 version = "2.13.0"
 source = { registry = "https://pypi.org/simple" }
@@ -922,6 +944,8 @@ wheels = [
 ]
 
 [[package]]
+=======
+>>>>>>> main
 name = "pyparsing"
 version = "3.3.2"
 source = { registry = "https://pypi.org/simple" }
@@ -931,6 +955,7 @@ wheels = [
 ]
 
 [[package]]
+<<<<<<< HEAD
 name = "pyspnego"
 version = "0.12.1"
 source = { registry = "https://pypi.org/simple" }
@@ -944,6 +969,8 @@ wheels = [
 ]
 
 [[package]]
+=======
+>>>>>>> main
 name = "pytest"
 version = "9.0.3"
 source = { registry = "https://pypi.org/simple" }
@@ -978,11 +1005,15 @@ source = { virtual = "." }
 dependencies = [
     { name = "matplotlib" },
     { name = "numpy" },
+<<<<<<< HEAD
     { name = "qiskit" },
     { name = "qiskit-ibm-runtime" },
     { name = "qiskit-machine-learning" },
     { name = "torchvision" },
     { name = "visualtorch" },
+=======
+    { name = "pillow" },
+>>>>>>> main
 ]
 
 [package.dev-dependencies]
@@ -993,6 +1024,7 @@ dev = [
 
 [package.metadata]
 requires-dist = [
+<<<<<<< HEAD
     { name = "matplotlib", specifier = ">=3.10.9" },
     { name = "numpy", specifier = ">=2.4.6" },
     { name = "qiskit", specifier = ">=2.4.1" },
@@ -1000,6 +1032,11 @@ requires-dist = [
     { name = "qiskit-machine-learning", specifier = ">=0.9.0" },
     { name = "torchvision", specifier = ">=0.27.0" },
     { name = "visualtorch", specifier = ">=0.2.4" },
+=======
+    { name = "matplotlib", specifier = ">=3.10.0" },
+    { name = "numpy", specifier = ">=2.4.6" },
+    { name = "pillow", specifier = ">=12.2.0" },
+>>>>>>> main
 ]
 
 [package.metadata.requires-dev]
@@ -1125,6 +1162,7 @@ wheels = [
 ]
 
 [[package]]
+<<<<<<< HEAD
 name = "rustworkx"
 version = "0.17.1"
 source = { registry = "https://pypi.org/simple" }
@@ -1229,6 +1267,8 @@ wheels = [
 ]
 
 [[package]]
+=======
+>>>>>>> main
 name = "six"
 version = "1.17.0"
 source = { registry = "https://pypi.org/simple" }
@@ -1236,6 +1276,7 @@ sdist = { url = "https://files.pythonhosted.org/packages/94/e7/b2c673351809dca68
 wheels = [
     { url = "https://files.pythonhosted.org/packages/b7/ce/149a00dd41f10bc29e5921b496af8b574d8413afcd5e30dfa0ed46c2cc5e/six-1.17.0-py2.py3-none-any.whl", hash = "sha256:4721f391ed90541fddacab5acf947aa0d3dc7d27b2e1e8eda2be8970586c3274", size = 11050, upload-time = "2024-12-04T17:35:26.475Z" },
 ]
+<<<<<<< HEAD
 
 [[package]]
 name = "sspilib"
@@ -1388,3 +1429,5 @@ sdist = { url = "https://files.pythonhosted.org/packages/2d/09/2c42a3d9c531ee794
 wheels = [
     { url = "https://files.pythonhosted.org/packages/3a/0f/504fcec35cc8eaf959364482e1dc2b061b279f49fbd0bab0d4df2742ddee/visualtorch-0.2.4-py3-none-any.whl", hash = "sha256:b84e9115204d3a4d1c2d054f85cdcc7ae0e154ece18340622e6ea832736c442c", size = 19965, upload-time = "2025-06-23T22:19:51.734Z" },
 ]
+=======
+>>>>>>> main
