@@ -61,11 +61,6 @@ class TumorTrackerApp:
             on_click=self.classification,
         )
 
-        self.detect_btn = ft.ElevatedButton(
-            "Détecter",
-            on_click=self.detection,
-        )
-
         self.image_select_btn = ft.ElevatedButton(
             "Choisir une image",
             icon=ft.Icons.UPLOAD_FILE,
@@ -133,7 +128,6 @@ class TumorTrackerApp:
                                 weight=ft.FontWeight.BOLD,
                             ),
                             self.classify_btn,
-                            self.detect_btn,
                         ],
                         spacing=10,
                         horizontal_alignment=ft.CrossAxisAlignment.CENTER,
@@ -203,10 +197,6 @@ class TumorTrackerApp:
             )
             self.output_container_content.value = "Erreur pendant la classification."
 
-        self.update()
-
-    def detection(self, e=None):
-        self.output_container_content.value = "Détection en cours..."
         self.update()
 
 
