@@ -23,10 +23,9 @@ from qcnn import DEFAULT_FEATURE_PATH, build_qcnn_estimator
 LOGGER = logging.getLogger(__name__)
 
 DEFAULT_DATASET_PATH = Path("data/archive/Data")
+DEFAULT_LABEL_PATH = Path("data/preprocessed/q_train_labels.npy")
 DEFAULT_CLASSES = (
     "normal",
-    "glioma_tumor",
-    "pituitary_tumor",
     "meningioma_tumor",
 )
 IMAGE_EXTENSIONS = (".png", ".jpg", ".jpeg")
@@ -88,6 +87,12 @@ def parse_args() -> argparse.Namespace:
         type=Path,
         default=DEFAULT_FEATURE_PATH,
         help="Path to saved quanvolution features used for size warnings.",
+    )
+    parser.add_argument(
+        "--label-path",
+        type=Path,
+        default=DEFAULT_LABEL_PATH,
+        help="Path to labels saved with the quanvolution feature maps.",
     )
     parser.add_argument(
         "--samples-per-class",
@@ -282,7 +287,11 @@ def diagnose_images(
     return diagnostics, metadata
 
 
-def warn_about_preprocessed_features(feature_path: Path, dataset_path: Path) -> None:
+def warn_about_preprocessed_features(
+    feature_path: Path,
+    label_path: Path,
+    dataset_path: Path,
+) -> None:
     """Print warnings for feature tensors that are too small for reliable training."""
     if not feature_path.exists():
         print(f"Warning: preprocessed feature file not found: {feature_path}")
@@ -301,6 +310,27 @@ def warn_about_preprocessed_features(feature_path: Path, dataset_path: Path) -> 
     print(f"  feature_path: {feature_path}")
     print(f"  feature_shape: {tuple(features.shape)}")
     print(f"  raw_dataset_images_counted: {raw_total}")
+
+    if label_path.exists():
+        labels = np.load(label_path)
+        unique_labels, counts = np.unique(labels, return_counts=True)
+        label_counts = {
+            int(label): int(count)
+            for label, count in zip(unique_labels.tolist(), counts.tolist())
+        }
+        print(f"  label_path: {label_path}")
+        print(f"  saved_label_counts: {label_counts}")
+        if len(unique_labels) == 1:
+            print(
+                "  warning: saved preprocessed labels contain one class only; "
+                "training cannot learn a useful binary boundary."
+            )
+    else:
+        print(f"  label_path: {label_path} (missing)")
+        print(
+            "  warning: saved labels are missing; training will need a legacy "
+            "dataset-order fallback and may mismatch features to labels."
+        )
 
     if feature_images < len(DEFAULT_CLASSES) * 5:
         print(
@@ -446,7 +476,11 @@ def run(args: argparse.Namespace) -> int:
 
     print_checkpoint_metadata(metadata)
     print()
-    warn_about_preprocessed_features(args.feature_path, args.dataset_path)
+    warn_about_preprocessed_features(
+        args.feature_path,
+        args.label_path,
+        args.dataset_path,
+    )
     print()
     print_image_rows(diagnostics)
     print()

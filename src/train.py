@@ -19,6 +19,7 @@ LOGGER = logging.getLogger(__name__)
 DEFAULT_CHECKPOINT_PATH = Path("checkpoints/qcnn_weights.npz")
 DEFAULT_DATASET_PATH = Path("data/archive/Data")
 DEFAULT_IMAGE_SIZE = 256
+DEFAULT_LABEL_PATH = Path("data/preprocessed/q_train_labels.npy")
 
 
 def configure_logging() -> None:
@@ -49,13 +50,13 @@ def parse_args() -> argparse.Namespace:
         "--train-size",
         type=int,
         default=6,
-        help="Number of training samples to use.",
+        help="Number of preprocessed images to use for training.",
     )
     parser.add_argument(
         "--test-size",
         type=int,
         default=2,
-        help="Number of testing samples to use.",
+        help="Number of preprocessed images to use for testing.",
     )
     parser.add_argument(
         "--use-initial",
@@ -73,6 +74,15 @@ def parse_args() -> argparse.Namespace:
         type=Path,
         default=DEFAULT_FEATURE_PATH,
         help="Path to saved quanvolution feature maps.",
+    )
+    parser.add_argument(
+        "--label-path",
+        type=Path,
+        default=None,
+        help=(
+            "Path to labels saved with the quanvolution feature maps. Defaults to "
+            "a sidecar inferred from --feature-path."
+        ),
     )
     parser.add_argument(
         "--dataset-path",
@@ -140,9 +150,119 @@ def _expand_spatial_features(
     return expanded_features.astype(float), expanded_labels
 
 
+def _default_label_path(feature_path: Path) -> Path:
+    """Return the conventional sidecar label path for a feature tensor."""
+    if feature_path.name == "q_train_images.npy":
+        return feature_path.with_name("q_train_labels.npy")
+    return feature_path.with_name(f"{feature_path.stem}_labels.npy")
+
+
+def _load_feature_labels(
+    *,
+    feature_path: Path,
+    label_path: Path | None,
+    dataset_path: Path,
+    image_size: tuple[int, int],
+) -> tuple[np.ndarray, np.ndarray]:
+    """Load preprocessed feature maps and their image-level labels."""
+    raw_features = np.load(feature_path)
+    candidate_label_path = label_path or _default_label_path(feature_path)
+
+    if candidate_label_path.exists():
+        labels = np.load(candidate_label_path)
+        LOGGER.info("Loaded preprocessed labels from %s.", candidate_label_path)
+    else:
+        LOGGER.warning(
+            "Label sidecar not found at %s; falling back to legacy dataset-order labels.",
+            candidate_label_path,
+        )
+        _, labels = load_brain_tumor_dataset(dataset_path, image_size=image_size)
+
+    image_count = min(len(raw_features), len(labels))
+    if image_count == 0:
+        raise ValueError("No preprocessed features and labels are available.")
+    if len(raw_features) != len(labels):
+        LOGGER.warning(
+            "Feature/label count mismatch: features=%s labels=%s; using first %s.",
+            len(raw_features),
+            len(labels),
+            image_count,
+        )
+
+    return raw_features[:image_count], np.asarray(labels[:image_count], dtype=int)
+
+
+def _split_image_indices(
+    *,
+    labels: np.ndarray,
+    train_size: int,
+    test_size: int,
+    seed: int,
+) -> tuple[np.ndarray, np.ndarray]:
+    """Split image indices before patch expansion to avoid same-image leakage."""
+    if train_size < 1 or test_size < 1:
+        raise ValueError("--train-size and --test-size must both be at least 1.")
+
+    requested = train_size + test_size
+    image_count = len(labels)
+    if requested > image_count:
+        raise ValueError(
+            f"Requested {requested} preprocessed images, but only {image_count} are available."
+        )
+
+    rng = np.random.default_rng(seed)
+    unique_labels = np.unique(labels)
+    if len(unique_labels) > 1 and requested >= len(unique_labels) * 2:
+        split_labels = rng.permutation(unique_labels)
+        train_parts: list[np.ndarray] = []
+        test_parts: list[np.ndarray] = []
+        train_base = train_size // len(unique_labels)
+        train_remainder = train_size % len(unique_labels)
+        test_base = test_size // len(unique_labels)
+        test_remainder = test_size % len(unique_labels)
+
+        for class_offset, label in enumerate(split_labels):
+            class_indices = rng.permutation(np.flatnonzero(labels == label))
+            class_train_size = train_base + int(class_offset < train_remainder)
+            class_test_size = test_base + int(class_offset < test_remainder)
+            class_requested = class_train_size + class_test_size
+
+            if class_requested > len(class_indices):
+                raise ValueError(
+                    "Not enough preprocessed images for label "
+                    f"{label}: requested {class_requested}, found {len(class_indices)}."
+                )
+
+            train_parts.append(class_indices[:class_train_size])
+            test_parts.append(
+                class_indices[class_train_size : class_train_size + class_test_size]
+            )
+
+        train_indices = rng.permutation(np.concatenate(train_parts))
+        test_indices = rng.permutation(np.concatenate(test_parts))
+    else:
+        indices = rng.permutation(image_count)[:requested]
+        train_indices = indices[:train_size]
+        test_indices = indices[train_size:]
+
+    for split_name, split_indices in (
+        ("train", train_indices),
+        ("test", test_indices),
+    ):
+        unique_targets = np.unique(labels[split_indices])
+        if len(unique_targets) == 1:
+            LOGGER.warning(
+                "%s image split contains one raw class only; metrics may be misleading.",
+                split_name,
+            )
+
+    return train_indices, test_indices
+
+
 def load_qcnn_data(
     *,
     feature_path: Path,
+    label_path: Path | None = None,
     dataset_path: Path,
     train_size: int,
     test_size: int,
@@ -150,42 +270,41 @@ def load_qcnn_data(
     seed: int,
     image_size: tuple[int, int],
 ) -> tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
-    """Load saved features, recover labels, and split them into train/test sets."""
-    raw_features = np.load(feature_path)
-    _, labels = load_brain_tumor_dataset(dataset_path, image_size=image_size)
-
-    image_count = min(len(raw_features), len(labels))
-    features, labels = _expand_spatial_features(
-        raw_features[:image_count],
-        labels[:image_count],
+    """Load saved features, split images, then expand each split into patches."""
+    raw_features, labels = _load_feature_labels(
+        feature_path=feature_path,
+        label_path=label_path,
+        dataset_path=dataset_path,
+        image_size=image_size,
     )
 
-    sample_count = len(features)
-    requested = train_size + test_size
-    if requested > sample_count:
-        raise ValueError(
-            f"Requested {requested} samples, but only {sample_count} are available."
-        )
+    train_indices, test_indices = _split_image_indices(
+        labels=labels,
+        train_size=train_size,
+        test_size=test_size,
+        seed=seed,
+    )
+    train_labels = labels[train_indices]
+    test_labels = labels[test_indices]
 
-    targets = np.where(labels == positive_label, 1.0, -1.0)
-
-    rng = np.random.default_rng(seed)
-    indices = rng.permutation(sample_count)[:requested]
-    train_indices = indices[:train_size]
-    test_indices = indices[train_size:]
-
-    unique_targets = np.unique(targets[indices])
-    if len(unique_targets) == 1:
+    if len(np.unique(labels[np.concatenate([train_indices, test_indices])])) == 1:
         LOGGER.warning(
-            "Selected data contains one binary class only; accuracy may be misleading."
+            "Selected image data contains one raw class only; accuracy may be misleading."
         )
 
-    return (
-        features[train_indices],
-        targets[train_indices],
-        features[test_indices],
-        targets[test_indices],
+    train_inputs, train_image_labels = _expand_spatial_features(
+        raw_features[train_indices],
+        train_labels,
     )
+    test_inputs, test_image_labels = _expand_spatial_features(
+        raw_features[test_indices],
+        test_labels,
+    )
+
+    train_targets = np.where(train_image_labels == positive_label, 1.0, -1.0)
+    test_targets = np.where(test_image_labels == positive_label, 1.0, -1.0)
+
+    return train_inputs, train_targets, test_inputs, test_targets
 
 
 def reduced_image_size(reduction_factor: int) -> tuple[int, int]:
@@ -305,6 +424,7 @@ def train(args: argparse.Namespace) -> np.ndarray:
     LOGGER.info("Loading training data from %s", args.feature_path)
     train_inputs, train_targets, test_inputs, test_targets = load_qcnn_data(
         feature_path=args.feature_path,
+        label_path=args.label_path,
         dataset_path=args.dataset_path,
         train_size=args.train_size,
         test_size=args.test_size,
