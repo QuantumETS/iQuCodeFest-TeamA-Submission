@@ -50,13 +50,31 @@ def parse_args() -> argparse.Namespace:
         "--train-size",
         type=int,
         default=6,
-        help="Number of preprocessed images to use for training.",
+        help="Number of expanded spatial QCNN samples to use for training.",
     )
     parser.add_argument(
         "--test-size",
         type=int,
         default=2,
-        help="Number of preprocessed images to use for testing.",
+        help="Number of expanded spatial QCNN samples to use for testing.",
+    )
+    parser.add_argument(
+        "--train-images",
+        type=int,
+        default=None,
+        help=(
+            "Number of preprocessed images to reserve for training before patch "
+            "expansion. Defaults to a stratified 75/25 image split."
+        ),
+    )
+    parser.add_argument(
+        "--test-images",
+        type=int,
+        default=None,
+        help=(
+            "Number of preprocessed images to reserve for testing before patch "
+            "expansion. Defaults to a stratified 75/25 image split."
+        ),
     )
     parser.add_argument(
         "--use-initial",
@@ -177,6 +195,13 @@ def _load_feature_labels(
             candidate_label_path,
         )
         _, labels = load_brain_tumor_dataset(dataset_path, image_size=image_size)
+        if len(raw_features) != len(labels):
+            raise FileNotFoundError(
+                "Preprocessed label sidecar is required because feature and raw "
+                f"dataset label counts differ: features={len(raw_features)} "
+                f"raw_labels={len(labels)}. Re-run quanvolution preprocessing to "
+                f"create {candidate_label_path}."
+            )
 
     image_count = min(len(raw_features), len(labels))
     if image_count == 0:
@@ -195,31 +220,43 @@ def _load_feature_labels(
 def _split_image_indices(
     *,
     labels: np.ndarray,
-    train_size: int,
-    test_size: int,
+    train_images: int | None,
+    test_images: int | None,
     seed: int,
 ) -> tuple[np.ndarray, np.ndarray]:
     """Split image indices before patch expansion to avoid same-image leakage."""
-    if train_size < 1 or test_size < 1:
-        raise ValueError("--train-size and --test-size must both be at least 1.")
-
-    requested = train_size + test_size
     image_count = len(labels)
+    unique_labels = np.unique(labels)
+    class_count = len(unique_labels)
+
+    if train_images is None and test_images is None:
+        test_images = max(class_count, int(round(image_count * 0.25)))
+        train_images = image_count - test_images
+    elif train_images is None:
+        if test_images is None:
+            raise ValueError("Internal split error: test_images was not resolved.")
+        train_images = image_count - test_images
+    elif test_images is None:
+        test_images = image_count - train_images
+
+    if train_images < 1 or test_images < 1:
+        raise ValueError("--train-images and --test-images must both be at least 1.")
+
+    requested = train_images + test_images
     if requested > image_count:
         raise ValueError(
             f"Requested {requested} preprocessed images, but only {image_count} are available."
         )
 
     rng = np.random.default_rng(seed)
-    unique_labels = np.unique(labels)
     if len(unique_labels) > 1 and requested >= len(unique_labels) * 2:
         split_labels = rng.permutation(unique_labels)
         train_parts: list[np.ndarray] = []
         test_parts: list[np.ndarray] = []
-        train_base = train_size // len(unique_labels)
-        train_remainder = train_size % len(unique_labels)
-        test_base = test_size // len(unique_labels)
-        test_remainder = test_size % len(unique_labels)
+        train_base = train_images // len(unique_labels)
+        train_remainder = train_images % len(unique_labels)
+        test_base = test_images // len(unique_labels)
+        test_remainder = test_images % len(unique_labels)
 
         for class_offset, label in enumerate(split_labels):
             class_indices = rng.permutation(np.flatnonzero(labels == label))
@@ -242,8 +279,8 @@ def _split_image_indices(
         test_indices = rng.permutation(np.concatenate(test_parts))
     else:
         indices = rng.permutation(image_count)[:requested]
-        train_indices = indices[:train_size]
-        test_indices = indices[train_size:]
+        train_indices = indices[:train_images]
+        test_indices = indices[train_images:]
 
     for split_name, split_indices in (
         ("train", train_indices),
@@ -259,6 +296,47 @@ def _split_image_indices(
     return train_indices, test_indices
 
 
+def _sample_spatial_examples(
+    *,
+    features: np.ndarray,
+    targets: np.ndarray,
+    sample_size: int,
+    seed: int,
+    split_name: str,
+) -> tuple[np.ndarray, np.ndarray]:
+    """Sample expanded patch examples while preserving class balance where possible."""
+    if sample_size < 1:
+        raise ValueError(f"--{split_name}-size must be at least 1.")
+    if sample_size > len(features):
+        raise ValueError(
+            f"Requested {sample_size} {split_name} spatial samples, but only "
+            f"{len(features)} are available after image split expansion."
+        )
+
+    rng = np.random.default_rng(seed)
+    unique_targets = np.unique(targets)
+    if len(unique_targets) > 1 and sample_size >= len(unique_targets):
+        selected_parts: list[np.ndarray] = []
+        base = sample_size // len(unique_targets)
+        remainder = sample_size % len(unique_targets)
+
+        for target_offset, target in enumerate(rng.permutation(unique_targets)):
+            target_indices = rng.permutation(np.flatnonzero(targets == target))
+            target_sample_size = base + int(target_offset < remainder)
+            if target_sample_size > len(target_indices):
+                raise ValueError(
+                    f"Not enough {split_name} spatial samples for target {target}: "
+                    f"requested {target_sample_size}, found {len(target_indices)}."
+                )
+            selected_parts.append(target_indices[:target_sample_size])
+
+        selected_indices = rng.permutation(np.concatenate(selected_parts))
+    else:
+        selected_indices = rng.permutation(len(features))[:sample_size]
+
+    return features[selected_indices], targets[selected_indices]
+
+
 def load_qcnn_data(
     *,
     feature_path: Path,
@@ -266,11 +344,13 @@ def load_qcnn_data(
     dataset_path: Path,
     train_size: int,
     test_size: int,
+    train_images: int | None = None,
+    test_images: int | None = None,
     positive_label: int,
     seed: int,
     image_size: tuple[int, int],
 ) -> tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
-    """Load saved features, split images, then expand each split into patches."""
+    """Load saved features, split images, then sample expanded patches."""
     raw_features, labels = _load_feature_labels(
         feature_path=feature_path,
         label_path=label_path,
@@ -280,8 +360,8 @@ def load_qcnn_data(
 
     train_indices, test_indices = _split_image_indices(
         labels=labels,
-        train_size=train_size,
-        test_size=test_size,
+        train_images=train_images,
+        test_images=test_images,
         seed=seed,
     )
     train_labels = labels[train_indices]
@@ -303,6 +383,27 @@ def load_qcnn_data(
 
     train_targets = np.where(train_image_labels == positive_label, 1.0, -1.0)
     test_targets = np.where(test_image_labels == positive_label, 1.0, -1.0)
+
+    train_inputs, train_targets = _sample_spatial_examples(
+        features=train_inputs,
+        targets=train_targets,
+        sample_size=train_size,
+        seed=seed,
+        split_name="train",
+    )
+    test_inputs, test_targets = _sample_spatial_examples(
+        features=test_inputs,
+        targets=test_targets,
+        sample_size=test_size,
+        seed=seed + 1,
+        split_name="test",
+    )
+
+    LOGGER.info(
+        "Image split ready: train_images=%s test_images=%s.",
+        len(train_indices),
+        len(test_indices),
+    )
 
     return train_inputs, train_targets, test_inputs, test_targets
 
@@ -428,6 +529,8 @@ def train(args: argparse.Namespace) -> np.ndarray:
         dataset_path=args.dataset_path,
         train_size=args.train_size,
         test_size=args.test_size,
+        train_images=args.train_images,
+        test_images=args.test_images,
         positive_label=args.positive_label,
         seed=args.seed,
         image_size=image_size,
