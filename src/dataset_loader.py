@@ -71,6 +71,26 @@ def load_brain_tumor_dataset(dataset_path, grayscale=True, normalize=True):
     return X, y
 
 
+def dataset_separator(X, y):
+    """
+    Separates the dataset into training and testing sets.
+
+    Args:
+        X: np.ndarray of images
+        y: np.ndarray of labels
+    Returns:
+        X_train: np.ndarray of training images
+        y_train: np.ndarray of training labels
+        X_test: np.ndarray of testing images
+        y_test: np.ndarray of testing labels
+    """
+    from sklearn.model_selection import train_test_split
+
+    X_train, X_test, y_train, y_test = train_test_split(
+        X, y, test_size=0.15, random_state=42, stratify=y
+    )
+    return X_train, y_train, X_test, y_test
+
 def dataset_to_torch(X, y):
     """
     Converts the dataset from NumPy arrays to PyTorch tensors.
