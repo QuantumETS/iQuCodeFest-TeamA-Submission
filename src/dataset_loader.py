@@ -9,7 +9,13 @@ CLASSES = {"glioma_tumor": 0, "pituitary_tumor": 1, "normal": 2, "meningioma_tum
 IMAGE_SIZE = (256, 256)
 
 
-def load_brain_tumor_dataset(dataset_path, grayscale=True, normalize=True, classes=None):
+def load_brain_tumor_dataset(
+    dataset_path,
+    grayscale=True,
+    normalize=True,
+    classes=None,
+    image_size=IMAGE_SIZE,
+):
     """
     Loads a brain tumor image dataset into NumPy arrays.
 
@@ -25,12 +31,11 @@ def load_brain_tumor_dataset(dataset_path, grayscale=True, normalize=True, class
         X: np.ndarray of images
         y: np.ndarray of labels
     """
-    
+
     if classes is not None:
         selected_classes = {k: i for i, k in enumerate(classes)}
     else:
         selected_classes = CLASSES
-        
 
     images = []
     labels = []
@@ -54,7 +59,7 @@ def load_brain_tumor_dataset(dataset_path, grayscale=True, normalize=True, class
                     else:
                         image = image.convert("RGB")
 
-                    image = image.resize(IMAGE_SIZE)
+                    image = image.resize(image_size)
 
                     image_array = np.array(image, dtype=np.float32)
 
@@ -97,6 +102,7 @@ def dataset_separator(X, y):
     )
     return X_train, y_train, X_test, y_test
 
+
 def dataset_to_torch(X, y):
     """
     Converts the dataset from NumPy arrays to PyTorch tensors.
@@ -116,7 +122,9 @@ def dataset_to_torch(X, y):
 
 if __name__ == "__main__":
     dataset_path = "data/archive/Data"
-    X, y = load_brain_tumor_dataset(dataset_path, classes=["meningioma_tumor", "normal"])
+    X, y = load_brain_tumor_dataset(
+        dataset_path, classes=["meningioma_tumor", "normal"]
+    )
     print("Dataset loaded:")
     print("X shape:", X.shape)
     print("y shape:", y.shape)
