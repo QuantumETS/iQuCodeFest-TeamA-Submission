@@ -60,7 +60,7 @@ class TumorTrackerApp:
             "Classify",
             on_click=self.classification,
         )
-        
+
         self.image_select_btn = ft.ElevatedButton(
             "Choose an image",
             icon=ft.Icons.UPLOAD_FILE,
@@ -100,7 +100,9 @@ class TumorTrackerApp:
         page.add(
             ft.Row(
                 [
-                    ft.Text("Quantum Tumor Classifier", size=24, weight=ft.FontWeight.BOLD),
+                    ft.Text(
+                        "Quantum Tumor Classifier", size=24, weight=ft.FontWeight.BOLD
+                    ),
                 ],
                 alignment=ft.MainAxisAlignment.CENTER,
                 margin=20,
@@ -122,7 +124,9 @@ class TumorTrackerApp:
                     ),
                     ft.Column(
                         [
-                            ft.Text("Select an option", size=20, weight=ft.FontWeight.BOLD),
+                            ft.Text(
+                                "Select an option", size=20, weight=ft.FontWeight.BOLD
+                            ),
                             self.classify_btn,
                         ],
                         spacing=10,
@@ -167,23 +171,6 @@ class TumorTrackerApp:
             self.output_container_content.value = "Veuillez choisir une image."
             self.update()
             return
-
-        Returns:
-            None.
-        """
-        self.page.update()
-        
-    def classification(self):
-        self.output_container_content.value = "Classification in progress..."
-        self.update()
-        pass
-    
-    def detection(self):
-        self.output_container_content.value = "Detection in progress..."
-        self.update()
-        pass
-
-
         try:
             self.output_container_content.value = classify_image(
                 self.selected_image_path
