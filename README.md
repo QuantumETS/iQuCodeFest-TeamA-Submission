@@ -1,4 +1,6 @@
 # iQuCodeFest 2026 - Quantum ÉTS Team A
+
+## Pour executer le code, utiliser la branch avec le tag release et non main : https://github.com/QuantumETS/iQuCodeFest-TeamA-Submission/releases/tag/v0.1.0
 pour executer le code, faire `uv sync` pour syncroniser les paquets requis, 
 à partir du root du repo, faire `python src/quanvolution_layer.py` --preprocess pour généré les données
 faire `python src/quanvolution_layer.py` pour juste afficher les données 
