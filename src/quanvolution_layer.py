@@ -303,7 +303,13 @@ def _balanced_indices(
         class_label = CLASSES[class_name]
         class_indices = np.flatnonzero(labels == class_label)
         if len(class_indices) == 0:
-            raise ValueError(f"No images found for class {class_name!r}.")
+            present_labels = tuple(int(label) for label in np.unique(labels))
+            raise ValueError(
+                f"No images found for class {class_name!r} with label {class_label}. "
+                f"Present labels are {present_labels}. If dataset classes were "
+                "filtered before this step, keep the original CLASSES label values "
+                "so training and inference agree."
+            )
 
         sample_count = min(samples_per_class, len(class_indices))
         if sample_count < samples_per_class:
@@ -324,12 +330,12 @@ def _balanced_indices(
 def extract_quantum_feature_maps(args) -> None:
     """Extract, save, load, and display quanvolutional feature maps."""
     image_size = reduced_image_size(args.resolution_reduction)
+    classes = tuple(args.classes)
     all_images, all_labels = load_brain_tumor_dataset(
         args.dataset_path,
         image_size=image_size,
     )
 
-    classes = tuple(args.classes)
     samples_per_class = args.samples_per_class
     if samples_per_class is None:
         samples_per_class = max(1, args.samples // len(classes))
