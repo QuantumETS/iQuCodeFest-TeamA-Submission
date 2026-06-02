@@ -2,20 +2,12 @@ import numpy as np
 from dataset_loader import load_brain_tumor_dataset
 import matplotlib.pyplot as plt
 from pathlib import Path
+from plotting import save_fig
 
 
 N_SAMPLES = 10
 
 X, y = load_brain_tumor_dataset("data/archive/Data")
-
-
-def save_fig(save_dir=Path("figures"), filename="figure.png", fig=None):
-    save_dir.mkdir(parents=True, exist_ok=True)
-    fig_path = save_dir / f"{filename}"
-    if fig is not None:
-        fig.savefig(fig_path)
-    else:
-        plt.savefig(fig_path)
 
 
 def get_random_subset(X, y, n_samples):
@@ -157,14 +149,13 @@ def extract_with_convolution(x_train, x_test, n_features=4):
             super().__init__()
 
             self.features = nn.Sequential(
-                nn.Conv2d(in_channels=1, out_channels=n_features, kernel_size=3),
+                nn.Conv2d(
+                    in_channels=1, out_channels=n_features, kernel_size=2, stride=2
+                ),
                 nn.ReLU(),
                 nn.MaxPool2d(kernel_size=2),
-                # Keep a fixed spatial size so the flatten dimension stays stable.
                 nn.AdaptiveAvgPool2d((13, 13)),
-                # Transforme les cartes de caractéristiques en vecteurs.
                 nn.Flatten(),
-                # Projette le grand vecteur convolutionnel vers quelques caractéristiques.
                 nn.Linear(n_features * 13 * 13, n_features),
             )
 
@@ -177,7 +168,7 @@ def extract_with_convolution(x_train, x_test, n_features=4):
 
     conv_preprocessor = SimpleConvPreprocessor(n_features)
 
-    visualtorch.layered_view(
+    img = visualtorch.layered_view(
         conv_preprocessor,
         input_shape=(1, 1, 256, 256),
         legend=True,
@@ -187,6 +178,7 @@ def extract_with_convolution(x_train, x_test, n_features=4):
 
     plt.axis("off")
     plt.tight_layout()
+    plt.imshow(img)
     fig = plt.gcf()
 
     save_fig(
