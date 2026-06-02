@@ -1,4 +1,5 @@
 import logging
+from collections import Counter
 from pathlib import Path
 from typing import List, Sequence, Tuple, Union
 
@@ -10,7 +11,7 @@ from qiskit.circuit.library import n_local, zz_feature_map
 from qiskit.primitives import StatevectorEstimator
 from qiskit.quantum_info import SparsePauliOp
 
-from dataset_loader import load_brain_tumor_dataset
+from dataset_loader import CLASSES, load_brain_tumor_dataset
 
 logging.basicConfig(
     level=logging.INFO,
@@ -19,12 +20,16 @@ logging.basicConfig(
 logger = logging.getLogger(__name__)
 
 SAVE_PATH = "data/preprocessed/"
+DEFAULT_FEATURE_FILENAME = "q_train_images.npy"
+DEFAULT_LABEL_FILENAME = "q_train_labels.npy"
+DEFAULT_CLASS_FILENAME = "q_train_class_names.npy"
+DEFAULT_IMAGE_SIZE = 256
 
 # Hyperparameters: configurable kernel size and stride.
 # KERNEL_SIZE may be an int (square) or a tuple (kh, kw).
 # STRIDE may be an int or a tuple (sh, sw).
 KERNEL_SIZE: Union[int, Tuple[int, int]] = (2, 2)
-STRIDE: Union[int, Tuple[int, int]] = (2, 2)
+STRIDE: Union[int, Tuple[int, int]] = (4, 4)
 
 # Padding mode: "valid" (no padding) or "same".
 PADDING: str = "same"
@@ -240,6 +245,19 @@ def mock_image(height: int = 256, width: int = 256) -> np.ndarray:
     return np.random.rand(height, width, 1)
 
 
+def reduced_image_size(reduction_factor: int) -> tuple[int, int]:
+    """Return the square image size produced by a resolution reduction factor."""
+    if reduction_factor < 1:
+        raise ValueError("--resolution-reduction must be at least 1.")
+    if DEFAULT_IMAGE_SIZE % reduction_factor != 0:
+        raise ValueError(
+            f"--resolution-reduction must evenly divide {DEFAULT_IMAGE_SIZE}."
+        )
+
+    size = DEFAULT_IMAGE_SIZE // reduction_factor
+    return (size, size)
+
+
 def log_channel_statistics(q_train_images: np.ndarray) -> None:
     """Log per-channel value ranges for debugging visualization issues."""
     for channel in range(q_train_images.shape[-1]):
@@ -262,9 +280,81 @@ def log_channel_statistics(q_train_images: np.ndarray) -> None:
         )
 
 
+def _balanced_indices(
+    labels: np.ndarray,
+    *,
+    classes: Sequence[str],
+    samples_per_class: int,
+    seed: int,
+) -> np.ndarray:
+    """Return image indices balanced across the requested raw dataset classes."""
+    if samples_per_class < 1:
+        raise ValueError("--samples-per-class must be at least 1.")
+
+    rng = np.random.default_rng(seed)
+    selected_indices: list[int] = []
+
+    for class_name in classes:
+        if class_name not in CLASSES:
+            raise ValueError(
+                f"Unknown class {class_name!r}. Available classes: {tuple(CLASSES)}"
+            )
+
+        class_label = CLASSES[class_name]
+        class_indices = np.flatnonzero(labels == class_label)
+        if len(class_indices) == 0:
+            present_labels = tuple(int(label) for label in np.unique(labels))
+            raise ValueError(
+                f"No images found for class {class_name!r} with label {class_label}. "
+                f"Present labels are {present_labels}. If dataset classes were "
+                "filtered before this step, keep the original CLASSES label values "
+                "so training and inference agree."
+            )
+
+        sample_count = min(samples_per_class, len(class_indices))
+        if sample_count < samples_per_class:
+            logger.warning(
+                "Class %s has only %s images; requested %s.",
+                class_name,
+                sample_count,
+                samples_per_class,
+            )
+
+        selected = rng.choice(class_indices, size=sample_count, replace=False)
+        selected_indices.extend(int(index) for index in selected)
+
+    rng.shuffle(selected_indices)
+    return np.asarray(selected_indices, dtype=int)
+
+
 def extract_quantum_feature_maps(args) -> None:
     """Extract, save, load, and display quanvolutional feature maps."""
-    train_images = load_brain_tumor_dataset("data/archive/Data")[0][: args.samples]
+    image_size = reduced_image_size(args.resolution_reduction)
+    classes = tuple(args.classes)
+    all_images, all_labels = load_brain_tumor_dataset(
+        args.dataset_path,
+        image_size=image_size,
+    )
+
+    samples_per_class = args.samples_per_class
+    if samples_per_class is None:
+        samples_per_class = max(1, args.samples // len(classes))
+
+    selected_indices = _balanced_indices(
+        all_labels,
+        classes=classes,
+        samples_per_class=samples_per_class,
+        seed=args.seed,
+    )
+    train_images = all_images[selected_indices]
+    train_labels = all_labels[selected_indices]
+    label_counts = Counter(int(label) for label in train_labels)
+    logger.info(
+        "Selected %s balanced images across classes=%s label_counts=%s.",
+        len(train_images),
+        classes,
+        dict(label_counts),
+    )
 
     kh, kw = _normalize_pair(KERNEL_SIZE)
     n_qubits = kh * kw
@@ -300,9 +390,11 @@ def extract_quantum_feature_maps(args) -> None:
         log_channel_statistics(q_train_images)
 
         Path(SAVE_PATH).mkdir(parents=True, exist_ok=True)
-        np.save(Path(SAVE_PATH) / "q_train_images.npy", q_train_images)
+        np.save(Path(SAVE_PATH) / DEFAULT_FEATURE_FILENAME, q_train_images)
+        np.save(Path(SAVE_PATH) / DEFAULT_LABEL_FILENAME, train_labels)
+        np.save(Path(SAVE_PATH) / DEFAULT_CLASS_FILENAME, np.asarray(classes))
     else:
-        q_train_images = np.load(Path(SAVE_PATH) / "q_train_images.npy")
+        q_train_images = np.load(Path(SAVE_PATH) / DEFAULT_FEATURE_FILENAME)
 
     n_samples = len(train_images)
     n_channels = q_train_images.shape[-1]
@@ -347,16 +439,45 @@ if __name__ == "__main__":
         help="Run preprocessing instead of loading the saved feature maps.",
     )
     arg_parser.add_argument(
+        "--dataset-path",
+        type=Path,
+        default=Path("data/archive/Data"),
+        help="Path to the raw dataset class folders.",
+    )
+    arg_parser.add_argument(
         "--samples",
         type=int,
         default=4,
-        help="Number of samples to process for testing.",
+        help=(
+            "Legacy total sample hint. Used only when --samples-per-class is not set."
+        ),
+    )
+    arg_parser.add_argument(
+        "--samples-per-class",
+        type=int,
+        default=None,
+        help="Number of images to preprocess from each requested class.",
+    )
+    arg_parser.add_argument(
+        "--classes",
+        nargs="+",
+        default=["normal", "meningioma_tumor"],
+        help="Dataset class folders to sample for balanced preprocessing.",
     )
     arg_parser.add_argument(
         "--seed",
         type=int,
         default=RANDOM_SEED,
         help="Random seed for fixed quanvolutional filter parameters.",
+    )
+    arg_parser.add_argument(
+        "--resolution-reduction",
+        type=int,
+        default=1,
+        help=(
+            "Factor used to reduce dataset image resolution before quanvolution; "
+            "2 converts 256x256 images to 128x128."
+        ),
     )
 
     extract_quantum_feature_maps(arg_parser.parse_args())
