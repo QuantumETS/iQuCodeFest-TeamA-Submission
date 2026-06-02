@@ -6,7 +6,7 @@ from qiskit.circuit.library import n_local
 import logging
 
 logging.basicConfig(
-    level=logging.DEBUG, format="%(asctime)s - %(levelname)s - %(message)s"
+    level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s"
 )
 logger = logging.getLogger(__name__)
 
@@ -54,7 +54,6 @@ def estimate_expectations(qc: QuantumCircuit, input_data: list) -> list:
         )
         pubs = (circuit, observable_i)
         primitive_result = estimator.run(pubs=[pubs]).result()
-        print(primitive_result)
         results.append(primitive_result[0].data.evs)
     return [res for res in results]
 
@@ -76,9 +75,10 @@ def quanv(image):
                     image[j + 1, k + 1, 0],
                 ],
             )
-            print(
-                f"Quantum circuit results for region ({j}:{j + 2}, {k}:{k + 2}): {q_results}"
-            )
+            if k % 32 == 0:
+                logger.info(
+                    f"Processed block starting at ({j}, {k}), quantum results: {q_results}"
+                )
             # Assign expectation values to different channels of the output pixel (j/2, k/2)
             for c in range(4):
                 out[j // 2, k // 2, c] = q_results[c]
@@ -91,4 +91,3 @@ def mock_image():
 
 
 quanv_image = quanv(mock_image())
-print("Quanvolution output shape:", quanv_image.shape)  # Should be (128, 128, 4)
