@@ -1,8 +1,13 @@
 """Flet app for uploading, previewing, and classifying a single image."""
 
+import logging
+
 import flet as ft
 
 from inference import classify_image
+
+
+LOGGER = logging.getLogger(__name__)
 
 
 class TumorTrackerApp:
@@ -180,12 +185,22 @@ class TumorTrackerApp:
             self.output_container_content.value = classify_image(
                 self.selected_image_path
             )
+            if self.output_container_content.value == "Oh no, you have a tumor!":
+                # text is red
+                self.output_container_content.color = ft.Colors.ERROR
+            else:
+                # text is green
+                self.output_container_content.color = ft.Colors.GREEN
         except FileNotFoundError as exc:
             if "Checkpoint not found" in str(exc):
                 self.output_container_content.value = "Checkpoint introuvable. Entrainez le modele avant la classification."
             else:
                 self.output_container_content.value = "Veuillez choisir une image."
         except Exception:
+            LOGGER.exception(
+                "Classification failed for selected image: %s",
+                self.selected_image_path,
+            )
             self.output_container_content.value = "Erreur pendant la classification."
 
         self.update()

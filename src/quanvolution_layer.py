@@ -19,12 +19,13 @@ logging.basicConfig(
 logger = logging.getLogger(__name__)
 
 SAVE_PATH = "data/preprocessed/"
+DEFAULT_IMAGE_SIZE = 256
 
 # Hyperparameters: configurable kernel size and stride.
 # KERNEL_SIZE may be an int (square) or a tuple (kh, kw).
 # STRIDE may be an int or a tuple (sh, sw).
 KERNEL_SIZE: Union[int, Tuple[int, int]] = (2, 2)
-STRIDE: Union[int, Tuple[int, int]] = (2, 2)
+STRIDE: Union[int, Tuple[int, int]] = (4, 4)
 
 # Padding mode: "valid" (no padding) or "same".
 PADDING: str = "same"
@@ -240,6 +241,19 @@ def mock_image(height: int = 256, width: int = 256) -> np.ndarray:
     return np.random.rand(height, width, 1)
 
 
+def reduced_image_size(reduction_factor: int) -> tuple[int, int]:
+    """Return the square image size produced by a resolution reduction factor."""
+    if reduction_factor < 1:
+        raise ValueError("--resolution-reduction must be at least 1.")
+    if DEFAULT_IMAGE_SIZE % reduction_factor != 0:
+        raise ValueError(
+            f"--resolution-reduction must evenly divide {DEFAULT_IMAGE_SIZE}."
+        )
+
+    size = DEFAULT_IMAGE_SIZE // reduction_factor
+    return (size, size)
+
+
 def log_channel_statistics(q_train_images: np.ndarray) -> None:
     """Log per-channel value ranges for debugging visualization issues."""
     for channel in range(q_train_images.shape[-1]):
@@ -264,7 +278,11 @@ def log_channel_statistics(q_train_images: np.ndarray) -> None:
 
 def extract_quantum_feature_maps(args) -> None:
     """Extract, save, load, and display quanvolutional feature maps."""
-    train_images = load_brain_tumor_dataset("data/archive/Data")[0][: args.samples]
+    image_size = reduced_image_size(args.resolution_reduction)
+    train_images = load_brain_tumor_dataset(
+        "data/archive/Data",
+        image_size=image_size,
+    )[0][: args.samples]
 
     kh, kw = _normalize_pair(KERNEL_SIZE)
     n_qubits = kh * kw
@@ -357,6 +375,15 @@ if __name__ == "__main__":
         type=int,
         default=RANDOM_SEED,
         help="Random seed for fixed quanvolutional filter parameters.",
+    )
+    arg_parser.add_argument(
+        "--resolution-reduction",
+        type=int,
+        default=1,
+        help=(
+            "Factor used to reduce dataset image resolution before quanvolution; "
+            "2 converts 256x256 images to 128x128."
+        ),
     )
 
     extract_quantum_feature_maps(arg_parser.parse_args())

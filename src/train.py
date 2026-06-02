@@ -18,6 +18,7 @@ LOGGER = logging.getLogger(__name__)
 
 DEFAULT_CHECKPOINT_PATH = Path("checkpoints/qcnn_weights.npz")
 DEFAULT_DATASET_PATH = Path("data/archive/Data")
+DEFAULT_IMAGE_SIZE = 256
 
 
 def configure_logging() -> None:
@@ -80,6 +81,15 @@ def parse_args() -> argparse.Namespace:
         help="Path to the original dataset, used to recover labels.",
     )
     parser.add_argument(
+        "--resolution-reduction",
+        type=int,
+        default=1,
+        help=(
+            "Factor used to reduce dataset image resolution before quanvolution; "
+            "2 converts 256x256 images to 128x128."
+        ),
+    )
+    parser.add_argument(
         "--feature-map",
         choices=("z", "zz"),
         default="z",
@@ -138,10 +148,11 @@ def load_qcnn_data(
     test_size: int,
     positive_label: int,
     seed: int,
+    image_size: tuple[int, int],
 ) -> tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
     """Load saved features, recover labels, and split them into train/test sets."""
     raw_features = np.load(feature_path)
-    _, labels = load_brain_tumor_dataset(dataset_path)
+    _, labels = load_brain_tumor_dataset(dataset_path, image_size=image_size)
 
     image_count = min(len(raw_features), len(labels))
     features, labels = _expand_spatial_features(
@@ -175,6 +186,19 @@ def load_qcnn_data(
         features[test_indices],
         targets[test_indices],
     )
+
+
+def reduced_image_size(reduction_factor: int) -> tuple[int, int]:
+    """Return the square image size produced by a resolution reduction factor."""
+    if reduction_factor < 1:
+        raise ValueError("--resolution-reduction must be at least 1.")
+    if DEFAULT_IMAGE_SIZE % reduction_factor != 0:
+        raise ValueError(
+            f"--resolution-reduction must evenly divide {DEFAULT_IMAGE_SIZE}."
+        )
+
+    size = DEFAULT_IMAGE_SIZE // reduction_factor
+    return (size, size)
 
 
 def build_optimizer(name: str, iterations: int):
@@ -276,6 +300,7 @@ def make_objective(
 def train(args: argparse.Namespace) -> np.ndarray:
     configure_logging()
     rng = np.random.default_rng(args.seed)
+    image_size = reduced_image_size(args.resolution_reduction)
 
     LOGGER.info("Loading training data from %s", args.feature_path)
     train_inputs, train_targets, test_inputs, test_targets = load_qcnn_data(
@@ -285,6 +310,7 @@ def train(args: argparse.Namespace) -> np.ndarray:
         test_size=args.test_size,
         positive_label=args.positive_label,
         seed=args.seed,
+        image_size=image_size,
     )
 
     LOGGER.info(
@@ -341,6 +367,8 @@ def train(args: argparse.Namespace) -> np.ndarray:
         iterations=args.iterations,
         train_accuracy=final_train_acc,
         test_accuracy=final_test_acc,
+        resolution_reduction=args.resolution_reduction,
+        image_size=np.asarray(image_size, dtype=int),
     )
     LOGGER.info("Saved checkpoint to %s", args.checkpoint_path)
     return final_weights
