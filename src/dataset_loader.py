@@ -9,7 +9,7 @@ CLASSES = {"glioma_tumor": 0, "pituitary_tumor": 1, "normal": 2, "meningioma_tum
 IMAGE_SIZE = (256, 256)
 
 
-def load_brain_tumor_dataset(dataset_path, grayscale=True, normalize=True):
+def load_brain_tumor_dataset(dataset_path, grayscale=True, normalize=True, classes=None):
     """
     Loads a brain tumor image dataset into NumPy arrays.
 
@@ -25,11 +25,17 @@ def load_brain_tumor_dataset(dataset_path, grayscale=True, normalize=True):
         X: np.ndarray of images
         y: np.ndarray of labels
     """
+    
+    if classes is not None:
+        selected_classes = {k: i for i, k in enumerate(classes)}
+    else:
+        selected_classes = CLASSES
+        
 
     images = []
     labels = []
 
-    for class_name, label in CLASSES.items():
+    for class_name, label in selected_classes.items():
         class_folder = os.path.join(dataset_path, class_name)
 
         if not os.path.isdir(class_folder):
@@ -90,7 +96,7 @@ def dataset_to_torch(X, y):
 
 if __name__ == "__main__":
     dataset_path = "data/archive/Data"
-    X, y = load_brain_tumor_dataset(dataset_path)
+    X, y = load_brain_tumor_dataset(dataset_path, classes=[2, 3])
     print("Dataset loaded:")
     print("X shape:", X.shape)
     print("y shape:", y.shape)
