@@ -116,7 +116,7 @@ def dataset_to_torch(X, y):
 
 if __name__ == "__main__":
     dataset_path = "data/archive/Data"
-    X, y = load_brain_tumor_dataset(dataset_path, classes=[2, 3])
+    X, y = load_brain_tumor_dataset(dataset_path, classes=["meningioma_tumor", "normal"])
     print("Dataset loaded:")
     print("X shape:", X.shape)
     print("y shape:", y.shape)
