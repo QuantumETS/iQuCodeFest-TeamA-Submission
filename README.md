@@ -1,7 +1,10 @@
 # iQuCodeFest 2026 - Quantum ÉTS Team A
-pour executer le code, faire uv sync pour syncroniser les paquets requis, 
+pour executer le code, faire `uv sync` pour syncroniser les paquets requis, 
 à partir du root du repo, faire `python src/quanvolution_layer.py` --preprocess pour généré les données
 faire `python src/quanvolution_layer.py` pour juste afficher les données 
+
+pour executer l'application de détection de tumor, il suffit de faire la commande
+`uv run flet run --recursive .\src\tumorApp.py`
 
 pour l'execution sur le hardware, créer un fichier .env avec CRN et TOKEN, voir .env.example
 
