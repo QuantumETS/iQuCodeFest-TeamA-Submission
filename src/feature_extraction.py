@@ -1,5 +1,5 @@
 import numpy as np
-from dataset_loader import load_brain_tumor_dataset
+from dataset_loader import load_brain_tumor_dataset, dataset_separator
 import matplotlib.pyplot as plt
 from pathlib import Path
 from plotting import save_fig
@@ -7,7 +7,10 @@ from plotting import save_fig
 
 N_SAMPLES = 10
 
-X, y = load_brain_tumor_dataset("data/archive/Data")
+X, y = load_brain_tumor_dataset(
+    "data/archive/Data", classes=["normal", "meningioma_tumor"]
+)
+X_train, y_train, X_test, y_test = dataset_separator(X, y)
 
 
 def get_random_subset(X, y, n_samples):
@@ -15,7 +18,7 @@ def get_random_subset(X, y, n_samples):
     return X[indices], y[indices]
 
 
-X_random_subset, y_random_subset = get_random_subset(X, y, N_SAMPLES)
+X_random_subset, y_random_subset = get_random_subset(X_train, y_train, N_SAMPLES)
 
 print("Subset of images shape:", X_random_subset.shape)
 print("Subset of labels shape:", y_random_subset.shape)
@@ -30,9 +33,6 @@ def show_sample_images(images, labels, num_images=10):
         ax.set_title(f"Label: {lbl}")
         ax.axis("off")
     plt.show()
-
-
-# show_sample_images(X_random_subset, y_random_subset, num_images=N_SAMPLES)
 
 
 def extract_with_PCA(x_train, x_test, n_components=50):
@@ -123,9 +123,6 @@ def extract_with_PCA(x_train, x_test, n_components=50):
 
     # Call the function
     visualize_preprocessing_and_pca(n_features, idx=0)
-
-
-# extract_with_PCA(X_random_subset, X_random_subset, n_components=8)
 
 
 def extract_with_convolution(x_train, x_test, n_features=4):
@@ -237,4 +234,7 @@ def extract_with_convolution(x_train, x_test, n_features=4):
         visualize_preprocessing_and_convolution(n_features, idx=i)
 
 
-extract_with_convolution(X_random_subset, X_random_subset, n_features=8)
+if __name__ == "__main__":
+    show_sample_images(X_random_subset, y_random_subset, num_images=N_SAMPLES)
+    # extract_with_PCA(X_random_subset, X_random_subset, n_components=8)
+    # extract_with_convolution(X_random_subset, X_random_subset, n_features=8)
