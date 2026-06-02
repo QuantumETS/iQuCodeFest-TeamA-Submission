@@ -1,14 +1,10 @@
 import os
-import numpy as np # uv add numpy
-from PIL import Image # uv add pillow
+import numpy as np
+from PIL import Image
+import torch
 
 
-CLASSES = {
-    "glioma_tumor": 0,
-    "pituitary_tumor": 1,
-    "normal": 2,
-    "meningioma_tumor": 3
-}
+CLASSES = {"glioma_tumor": 0, "pituitary_tumor": 1, "normal": 2, "meningioma_tumor": 3}
 
 IMAGE_SIZE = (256, 256)
 
@@ -73,3 +69,32 @@ def load_brain_tumor_dataset(dataset_path, grayscale=True, normalize=True):
         X = np.expand_dims(X, axis=-1)
 
     return X, y
+
+
+def dataset_to_torch(X, y):
+    """
+    Converts the dataset from NumPy arrays to PyTorch tensors.
+
+    Args:
+        X: np.ndarray of images
+        y: np.ndarray of labels
+
+    Returns:
+        X_tensor: torch.Tensor of images
+        y_tensor: torch.Tensor of labels
+    """
+    X_tensor = torch.from_numpy(X).float()
+    y_tensor = torch.from_numpy(y).long()
+    return X_tensor, y_tensor
+
+
+if __name__ == "__main__":
+    dataset_path = "data/archive/Data"
+    X, y = load_brain_tumor_dataset(dataset_path)
+    print("Dataset loaded:")
+    print("X shape:", X.shape)
+    print("y shape:", y.shape)
+    X_tensor, y_tensor = dataset_to_torch(X, y)
+    print("Tensors created:")
+    print("X_tensor shape:", X_tensor.shape)
+    print("y_tensor shape:", y_tensor.shape)
