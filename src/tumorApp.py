@@ -13,7 +13,7 @@ LOGGER = logging.getLogger(__name__)
 class TumorTrackerApp:
     def __init__(self, page: ft.Page):
         self.page = page
-        self.page.title = "Image Uploader"
+        self.page.title = "Quantum Tumor Tracker"
         self.page.padding = 20
         self.selected_image_path = None
 
@@ -100,7 +100,7 @@ class TumorTrackerApp:
         page.add(
             ft.Row(
                 [
-                    ft.Text("Image Uploader", size=24, weight=ft.FontWeight.BOLD),
+                    ft.Text("Quantum Tumor Tracker", size=24, weight=ft.FontWeight.BOLD),
                 ],
                 alignment=ft.MainAxisAlignment.CENTER,
                 margin=20,
