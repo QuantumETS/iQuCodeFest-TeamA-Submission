@@ -13,7 +13,7 @@ class TumorTrackerApp:
     def __init__(self, page: ft.Page):
         
         self.page = page
-        self.page.title = "Image Uploader"
+        self.page.title = "Quantum Tumor Classifier"
         self.page.padding = 20
 
         self.placeholder = ft.Container(
@@ -30,7 +30,7 @@ class TumorTrackerApp:
                         color=ft.Colors.with_opacity(0.3, ft.Colors.ON_SURFACE),
                     ),
                     ft.Text(
-                        "Aucune image",
+                        "No image selected",
                         color=ft.Colors.with_opacity(0.4, ft.Colors.ON_SURFACE),
                     ),
                 ],
@@ -50,23 +50,18 @@ class TumorTrackerApp:
         )
 
         self.status = ft.Text(
-            "Aucune image sélectionnée.",
+            "No image selected.",
             italic=True,
             color=ft.Colors.SECONDARY
         )
         
         self.classify_btn = ft.ElevatedButton(
-            "Classifier",
+            "Classify",
             on_click=self.classification,
         )
         
-        self.detect_btn = ft.ElevatedButton(
-            "Détecter",
-            on_click=self.detection,
-        )
-        
         self.image_select_btn = ft.ElevatedButton(
-            "Choisir une image",
+            "Choose an image",
             icon=ft.Icons.UPLOAD_FILE,
             on_click=self._handle_image_pick,
         )
@@ -86,7 +81,7 @@ class TumorTrackerApp:
         )
         
         self.placeholder_text = ft.Text(
-            "Aucun résultat à afficher.",
+            "No results to show.",
             color=ft.Colors.SECONDARY,
         )
         
@@ -97,14 +92,14 @@ class TumorTrackerApp:
         )
         
         self.output_container_content = ft.Text(
-            "Aucun résultat à afficher.",
+            "No results to show.",
             color=ft.Colors.SECONDARY,
         )
 
         page.add(
             ft.Row(
                 [
-                    ft.Text("Image Uploader", size=24, weight=ft.FontWeight.BOLD),
+                    ft.Text("Quantum Tumor Classifier", size=24, weight=ft.FontWeight.BOLD),
                 ],
                 alignment=ft.MainAxisAlignment.CENTER,
                 margin=20,
@@ -120,7 +115,7 @@ class TumorTrackerApp:
                                 ]
                             ),
                             ft.ElevatedButton(
-                                "Choisir une image",
+                                "Choose an image",
                                 icon=ft.Icons.UPLOAD_FILE,
                                 on_click=self._handle_image_pick,
                             ),
@@ -129,9 +124,8 @@ class TumorTrackerApp:
                     ),
                     ft.Column(
                         [
-                            ft.Text("Sélectionnez une option", size=20, weight=ft.FontWeight.BOLD),
+                            ft.Text("Select an option", size=20, weight=ft.FontWeight.BOLD),
                             self.classify_btn,
-                            self.detect_btn,
                         ],
                         spacing=10,
                         horizontal_alignment=ft.CrossAxisAlignment.CENTER,
@@ -171,12 +165,12 @@ class TumorTrackerApp:
         self.page.update()
         
     def classification(self):
-        self.output_container_content.value = "Classification en cours..."
+        self.output_container_content.value = "Classification in progress..."
         self.update()
         pass
     
     def detection(self):
-        self.output_container_content.value = "Détection en cours..."
+        self.output_container_content.value = "Detection in progress..."
         self.update()
         pass
 
