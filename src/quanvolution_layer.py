@@ -1,4 +1,5 @@
 import logging
+from collections import Counter
 from pathlib import Path
 from typing import List, Sequence, Tuple, Union
 
@@ -10,7 +11,7 @@ from qiskit.circuit.library import n_local, zz_feature_map
 from qiskit.primitives import StatevectorEstimator
 from qiskit.quantum_info import SparsePauliOp
 
-from dataset_loader import load_brain_tumor_dataset
+from dataset_loader import CLASSES, load_brain_tumor_dataset
 
 logging.basicConfig(
     level=logging.INFO,
@@ -19,6 +20,9 @@ logging.basicConfig(
 logger = logging.getLogger(__name__)
 
 SAVE_PATH = "data/preprocessed/"
+DEFAULT_FEATURE_FILENAME = "q_train_images.npy"
+DEFAULT_LABEL_FILENAME = "q_train_labels.npy"
+DEFAULT_CLASS_FILENAME = "q_train_class_names.npy"
 DEFAULT_IMAGE_SIZE = 256
 
 # Hyperparameters: configurable kernel size and stride.
@@ -276,13 +280,75 @@ def log_channel_statistics(q_train_images: np.ndarray) -> None:
         )
 
 
+def _balanced_indices(
+    labels: np.ndarray,
+    *,
+    classes: Sequence[str],
+    samples_per_class: int,
+    seed: int,
+) -> np.ndarray:
+    """Return image indices balanced across the requested raw dataset classes."""
+    if samples_per_class < 1:
+        raise ValueError("--samples-per-class must be at least 1.")
+
+    rng = np.random.default_rng(seed)
+    selected_indices: list[int] = []
+
+    for class_name in classes:
+        if class_name not in CLASSES:
+            raise ValueError(
+                f"Unknown class {class_name!r}. Available classes: {tuple(CLASSES)}"
+            )
+
+        class_label = CLASSES[class_name]
+        class_indices = np.flatnonzero(labels == class_label)
+        if len(class_indices) == 0:
+            raise ValueError(f"No images found for class {class_name!r}.")
+
+        sample_count = min(samples_per_class, len(class_indices))
+        if sample_count < samples_per_class:
+            logger.warning(
+                "Class %s has only %s images; requested %s.",
+                class_name,
+                sample_count,
+                samples_per_class,
+            )
+
+        selected = rng.choice(class_indices, size=sample_count, replace=False)
+        selected_indices.extend(int(index) for index in selected)
+
+    rng.shuffle(selected_indices)
+    return np.asarray(selected_indices, dtype=int)
+
+
 def extract_quantum_feature_maps(args) -> None:
     """Extract, save, load, and display quanvolutional feature maps."""
     image_size = reduced_image_size(args.resolution_reduction)
-    train_images = load_brain_tumor_dataset(
-        "data/archive/Data",
+    all_images, all_labels = load_brain_tumor_dataset(
+        args.dataset_path,
         image_size=image_size,
-    )[0][: args.samples]
+    )
+
+    classes = tuple(args.classes)
+    samples_per_class = args.samples_per_class
+    if samples_per_class is None:
+        samples_per_class = max(1, args.samples // len(classes))
+
+    selected_indices = _balanced_indices(
+        all_labels,
+        classes=classes,
+        samples_per_class=samples_per_class,
+        seed=args.seed,
+    )
+    train_images = all_images[selected_indices]
+    train_labels = all_labels[selected_indices]
+    label_counts = Counter(int(label) for label in train_labels)
+    logger.info(
+        "Selected %s balanced images across classes=%s label_counts=%s.",
+        len(train_images),
+        classes,
+        dict(label_counts),
+    )
 
     kh, kw = _normalize_pair(KERNEL_SIZE)
     n_qubits = kh * kw
@@ -318,9 +384,11 @@ def extract_quantum_feature_maps(args) -> None:
         log_channel_statistics(q_train_images)
 
         Path(SAVE_PATH).mkdir(parents=True, exist_ok=True)
-        np.save(Path(SAVE_PATH) / "q_train_images.npy", q_train_images)
+        np.save(Path(SAVE_PATH) / DEFAULT_FEATURE_FILENAME, q_train_images)
+        np.save(Path(SAVE_PATH) / DEFAULT_LABEL_FILENAME, train_labels)
+        np.save(Path(SAVE_PATH) / DEFAULT_CLASS_FILENAME, np.asarray(classes))
     else:
-        q_train_images = np.load(Path(SAVE_PATH) / "q_train_images.npy")
+        q_train_images = np.load(Path(SAVE_PATH) / DEFAULT_FEATURE_FILENAME)
 
     n_samples = len(train_images)
     n_channels = q_train_images.shape[-1]
@@ -365,10 +433,30 @@ if __name__ == "__main__":
         help="Run preprocessing instead of loading the saved feature maps.",
     )
     arg_parser.add_argument(
+        "--dataset-path",
+        type=Path,
+        default=Path("data/archive/Data"),
+        help="Path to the raw dataset class folders.",
+    )
+    arg_parser.add_argument(
         "--samples",
         type=int,
         default=4,
-        help="Number of samples to process for testing.",
+        help=(
+            "Legacy total sample hint. Used only when --samples-per-class is not set."
+        ),
+    )
+    arg_parser.add_argument(
+        "--samples-per-class",
+        type=int,
+        default=None,
+        help="Number of images to preprocess from each requested class.",
+    )
+    arg_parser.add_argument(
+        "--classes",
+        nargs="+",
+        default=["normal", "meningioma_tumor"],
+        help="Dataset class folders to sample for balanced preprocessing.",
     )
     arg_parser.add_argument(
         "--seed",
