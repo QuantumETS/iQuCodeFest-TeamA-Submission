@@ -16,6 +16,7 @@ dependencies = [
     "visualtorch>=0.2.4",
     "pylatexenc>=2.10",
     "torch>=2.12.0",
+    "flet>=0.85.2",
 ]
 
 [dependency-groups]
