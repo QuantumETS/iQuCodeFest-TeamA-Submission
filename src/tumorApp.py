@@ -1,6 +1,7 @@
 """Flet app for uploading, previewing, and classifying a single image."""
 
 import logging
+from concurrent.futures import ThreadPoolExecutor
 
 import flet as ft
 
@@ -167,32 +168,40 @@ class TumorTrackerApp:
         self.page.update()
 
     def classification(self, e=None):
-        if not self.selected_image_path:
-            self.output_container_content.value = "Veuillez choisir une image."
-            self.update()
-            return
+        self.output_container_content.value = "Classification en cours..."
+        self.update()
+
+        # Exécuter la classification dans un thread séparé
+        executor = ThreadPoolExecutor(max_workers=1)
+        future = executor.submit(self._run_classification)
+
+        # Une fois terminé, mettre à jour l'UI
+        self.page.run_task(self._handle_classification_done, future)
+
+    def _run_classification(self):
+        """Run classification in a separate thread (blocking operation)."""
         try:
-            self.output_container_content.value = classify_image(
-                self.selected_image_path
-            )
-            if self.output_container_content.value == "Oh no, you have a tumor!":
-                # text is red
-                self.output_container_content.color = ft.Colors.ERROR
-            else:
-                # text is green
-                self.output_container_content.color = ft.Colors.GREEN
+            return classify_image(self.selected_image_path)
         except FileNotFoundError as exc:
             if "Checkpoint not found" in str(exc):
-                self.output_container_content.value = "Checkpoint introuvable. Entrainez le modele avant la classification."
+                return "Checkpoint introuvable. Entrainez le modele avant la classification."
             else:
-                self.output_container_content.value = "Veuillez choisir une image."
+                return "Veuillez choisir une image."
         except Exception:
             LOGGER.exception(
                 "Classification failed for selected image: %s",
                 self.selected_image_path,
             )
-            self.output_container_content.value = "Erreur pendant la classification."
+            return "Erreur pendant la classification."
 
+    async def _handle_classification_done(self, future):
+        """Handle classification results and update UI."""
+        result = future.result()
+        self.output_container_content.value = result
+        if result == "Oh no, you have a tumor!":
+            self.output_container_content.color = ft.Colors.ERROR
+        else:
+            self.output_container_content.color = ft.Colors.GREEN
         self.update()
 
 
