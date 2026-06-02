@@ -13,7 +13,7 @@ class TumorTrackerApp:
     def __init__(self, page: ft.Page):
         
         self.page = page
-        self.page.title = "Image Uploader"
+        self.page.title = "Quantum Tumor Classifier"
         self.page.padding = 20
 
         self.placeholder = ft.Container(
@@ -60,11 +60,6 @@ class TumorTrackerApp:
             on_click=self.classification,
         )
         
-        self.detect_btn = ft.ElevatedButton(
-            "Détecter",
-            on_click=self.detection,
-        )
-        
         self.image_select_btn = ft.ElevatedButton(
             "Choisir une image",
             icon=ft.Icons.UPLOAD_FILE,
@@ -104,7 +99,7 @@ class TumorTrackerApp:
         page.add(
             ft.Row(
                 [
-                    ft.Text("Image Uploader", size=24, weight=ft.FontWeight.BOLD),
+                    ft.Text("Quantum Tumor Classifier", size=24, weight=ft.FontWeight.BOLD),
                 ],
                 alignment=ft.MainAxisAlignment.CENTER,
                 margin=20,
@@ -131,7 +126,6 @@ class TumorTrackerApp:
                         [
                             ft.Text("Sélectionnez une option", size=20, weight=ft.FontWeight.BOLD),
                             self.classify_btn,
-                            self.detect_btn,
                         ],
                         spacing=10,
                         horizontal_alignment=ft.CrossAxisAlignment.CENTER,
